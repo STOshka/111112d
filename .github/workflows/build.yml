@@ -1,0 +1,54 @@
+name: Сборка exe
+
+on:
+  workflow_dispatch:          # кнопка «Run workflow» во вкладке Actions
+  push:
+    paths:
+      - "raschet_kanikuly.py"
+      - ".github/workflows/build.yml"
+
+jobs:
+  build:
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Для Windows 7 и новее: Python 3.8, 32 бита
+          - name: RaschetKanikuly
+            python: "3.8"
+            arch: x86
+            packages: pyinstaller==5.13.2 openpyxl==3.1.2 reportlab==3.6.13
+          # Тестовая сборка: Python 3.12, только Windows 10/11
+          - name: RaschetKanikuly_TEST_py312
+            python: "3.12"
+            arch: x64
+            packages: pyinstaller==6.11.1 openpyxl==3.1.5 reportlab==4.2.5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          architecture: ${{ matrix.arch }}
+
+      - name: Установка библиотек
+        run: |
+          python --version
+          python -m pip install --upgrade "pip<25"
+          python -m pip install --only-binary=:all: ${{ matrix.packages }}
+
+      - name: Сборка
+        run: >
+          python -m PyInstaller --noconfirm --clean --onefile --windowed
+          --name ${{ matrix.name }}
+          --collect-submodules reportlab.pdfbase
+          --exclude-module numpy --exclude-module pandas
+          raschet_kanikuly.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: dist/${{ matrix.name }}.exe
+          retention-days: 30
